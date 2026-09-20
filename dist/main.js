@@ -8,43 +8,147 @@ function setTab(key){const data=content[key];document.querySelector('#demo-headi
 tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>setTab(tab.dataset.tab));tab.addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight')next=(i+1)%tabs.length;else if(event.key==='ArrowLeft')next=(i+tabs.length-1)%tabs.length;else if(event.key==='Home')next=0;else if(event.key==='End')next=tabs.length-1;else return;event.preventDefault();setTab(tabs[next].dataset.tab);tabs[next].focus();});});setTab('presence');
 
 const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-let scrollRange=1;
-function measureScroll(){scrollRange=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);updateScroll();}
-let progress=0;
-function updateScroll(){progress=Math.max(0,Math.min(1,window.scrollY/scrollRange));document.querySelector('#scroll-progress').style.width=`${progress*100}%`;}
-window.addEventListener('scroll',updateScroll,{passive:true});window.addEventListener('resize',measureScroll);new ResizeObserver(measureScroll).observe(document.body);measureScroll();
+const intro=document.querySelector('.intro');
+const introPin=document.querySelector('.intro-pin');
+const brand=document.querySelector('.intro-brand');
+const scrollHint=document.querySelector('.intro-scroll');
+const reveal=document.querySelector('.intro-reveal');
+const environment=document.querySelector('.intro-environment');
+const atmosphere=document.querySelector('.intro-atmosphere');
+const groundShadow=document.querySelector('.intro-ground-shadow');
+let scrollDriver=null,sceneFrame=()=>false,animationFrame=0,previousTime=0,scrollClock=0;
+function requestFrame(){if(!animationFrame&&!document.hidden){previousTime=performance.now();animationFrame=requestAnimationFrame(animate);}}
+function animate(time){
+  animationFrame=0;
+  const delta=Math.min((time-previousTime)/1000||1/60,.05);previousTime=time;
+  scrollClock+=delta*1000;scrollDriver?.raf(scrollClock);updateScroll();
+  const moving=sceneFrame(delta);
+  if((moving||scrollDriver?.isScrolling==='smooth')&&!document.hidden)animationFrame=requestAnimationFrame(animate);
+}
+let progress=0,introTop=0,introRange=1;
+const clamp=value=>Math.max(0,Math.min(1,value));
+const smooth=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*(3-2*t);};
+const cinematic=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*t*(10+t*(-15+6*t));};
+function measureScroll(){introTop=window.scrollY+intro.getBoundingClientRect().top;introRange=Math.max(1,intro.offsetHeight-introPin.offsetHeight);updateScroll();}
+function updateScroll(){progress=clamp((window.scrollY-introTop)/introRange);document.querySelector('.header').classList.toggle('is-past-intro',window.scrollY>intro.offsetHeight-100);}
+window.addEventListener('scroll',updateScroll,{passive:true});window.addEventListener('resize',measureScroll);new ResizeObserver(measureScroll).observe(intro);measureScroll();
+window.addEventListener('scroll',requestFrame,{passive:true});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(animationFrame);animationFrame=0;}else requestFrame();});
+async function initSmoothScroll(){
+  const {default:Lenis}=await import('./assets/lenis.module.js');
+  const desktop=matchMedia('(min-width: 701px) and (pointer: fine)');
+  function configure(){
+    scrollDriver?.destroy();scrollDriver=null;
+    if(desktop.matches&&!reduced.matches){
+      scrollDriver=new Lenis({autoRaf:false,lerp:.065,smoothWheel:true,syncTouch:false,wheelMultiplier:.85,anchors:false});
+      scrollDriver.on('virtual-scroll',requestFrame);
+      scrollDriver.on('scroll',updateScroll);
+    }
+    requestFrame();
+  }
+  document.addEventListener('click',event=>{
+    const link=event.target.closest?.('a[href^="#"]');
+    if(!scrollDriver||!link||event.defaultPrevented||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    const hash=link.getAttribute('href');
+    const target=hash==='#'?document.querySelector('#top'):document.getElementById(decodeURIComponent(hash.slice(1)));
+    if(!target)return;
+    event.preventDefault();history.pushState(null,'',hash);
+    scrollDriver.scrollTo(target,{offset:target===intro?0:-50,lerp:0,duration:1.8,easing:t=>1-Math.pow(1-t,4),onStart:requestFrame,onComplete:()=>{
+      if(link.classList.contains('skip')){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+    }});
+  });
+  desktop.addEventListener('change',configure);reduced.addEventListener('change',configure);configure();
+}
+initSmoothScroll().catch(error=>console.warn('Smooth scrolling unavailable',error));
+function presentScene(value){
+  const fade=smooth(.015,.21,value);
+  brand.style.opacity=String(reduced.matches?1:1-fade);
+  brand.style.transform=`translate(-50%,-50%) translateY(${-fade*24}px)`;
+  scrollHint.style.opacity=String(reduced.matches?0:1-smooth(.01,.14,value));
+  scrollHint.style.visibility=reduced.matches||value>.14?'hidden':'visible';
+  reveal.style.opacity=String(reduced.matches?1:smooth(.77,.92,value));
+  reveal.style.transform=`translateY(${(1-smooth(.77,.92,value))*18}px)`;
+  environment.style.transform=`scale(${1.055-.055*smooth(0,1,value)})`;
+  atmosphere.style.opacity=String(.24*(1-smooth(0,.8,value)));
+  document.querySelector('.intro-progress i').style.transform=`scaleX(${value})`;
+  introPin.dataset.sceneProgress=value.toFixed(4);
+}
+presentScene(reduced.matches?1:progress);
 
 async function initModel(){
   const THREE=await import('./assets/three.module.js');
   const canvas=document.querySelector('#plate'),stage=document.querySelector('#object-stage');
   const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'low-power'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
-  const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(35,1,.1,100);camera.position.set(0,0,8.5);
-  scene.add(new THREE.HemisphereLight(0xf2f3f5,0x15171a,2.2));
-  const key=new THREE.DirectionalLight(0xffffff,4);key.position.set(-3,5,6);scene.add(key);
-  const fill=new THREE.DirectionalLight(0xffffff,1.6);fill.position.set(5,-1,3);scene.add(fill);
-  const rim=new THREE.DirectionalLight(0xc6cbd2,5);rim.position.set(1,3,-4);scene.add(rim);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.16;
+  const scene=new THREE.Scene();const camera=new THREE.PerspectiveCamera(35,1,.1,100);camera.position.set(0,0,5);
+  scene.add(new THREE.HemisphereLight(0xe5effa,0x66615b,1.65));
+  const key=new THREE.DirectionalLight(0xfff5e7,2.6);key.position.set(-4,6,5);scene.add(key);
+  const fill=new THREE.DirectionalLight(0xc2d9f6,.9);fill.position.set(5,2,3);scene.add(fill);
+  const rim=new THREE.DirectionalLight(0xe1ecfa,3.8);rim.position.set(1,5,-4);scene.add(rim);
   const group=new THREE.Group();scene.add(group);
   function roundedPath(w,h,r){const s=new THREE.Shape();s.moveTo(-w/2+r,-h/2);s.lineTo(w/2-r,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);s.lineTo(w/2,h/2-r);s.quadraticCurveTo(w/2,h/2,w/2-r,h/2);s.lineTo(-w/2+r,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);s.lineTo(-w/2,-h/2+r);s.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);return s;}
   const shape=roundedPath(3.35,3.35,.24);
   for(const x of [-1.34,1.34])for(const y of [-1.34,1.34]){const hole=new THREE.Path();hole.absarc(x,y,.14,0,Math.PI*2,true);shape.holes.push(hole);}
-  const geo=new THREE.ExtrudeGeometry(shape,{depth:.095,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.028,bevelThickness:.028,curveSegments:24});geo.translate(0,0,-.0475);
-  const body=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x363638,roughness:.38,metalness:.45}));group.add(body);
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:.065,bevelEnabled:true,bevelSegments:5,steps:1,bevelSize:.016,bevelThickness:.016,curveSegments:48});geo.translate(0,0,-.0325);
+  // Fine moulded grain catches the atrium's light without making the plate look scratched.
+  const grainCanvas=document.createElement('canvas');grainCanvas.width=grainCanvas.height=256;
+  const grainContext=grainCanvas.getContext('2d'),grainPixels=grainContext.createImageData(256,256);
+  let seed=1977;for(let i=0;i<grainPixels.data.length;i+=4){seed=(1664525*seed+1013904223)>>>0;const v=115+(seed>>>26);grainPixels.data.set([v,v,v,255],i);}
+  grainContext.putImageData(grainPixels,0,0);
+  const grain=new THREE.CanvasTexture(grainCanvas);grain.wrapS=grain.wrapT=THREE.RepeatWrapping;grain.repeat.set(7,7);
+  const faceMaterial=new THREE.MeshPhysicalMaterial({color:0x41454b,roughness:.42,metalness:.32,clearcoat:.28,clearcoatRoughness:.32,bumpMap:grain,bumpScale:.0015,envMapIntensity:.9});
+  const edgeMaterial=new THREE.MeshPhysicalMaterial({color:0x282d34,roughness:.3,metalness:.45,clearcoat:.35,clearcoatRoughness:.25});
+  const body=new THREE.Mesh(geo,[faceMaterial,edgeMaterial]);group.add(body);
   // The supplied plate is reconstructed as geometry, with real through-holes and an unbranded NFC insert.
   function texture(draw){const c=document.createElement('canvas');c.width=c.height=1024;const ctx=c.getContext('2d');draw(ctx);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);return tex;}
   const front=texture(ctx=>{ctx.strokeStyle='#dddddf';ctx.fillStyle='#ededee';ctx.lineWidth=3;ctx.textAlign='center';ctx.font='26px Arial';ctx.fillText('ПРИЛОЖИТЕ СМАРТФОН',512,150);ctx.beginPath();ctx.roundRect(265,278,494,840,62);ctx.stroke();ctx.beginPath();ctx.roundRect(290,305,444,830,43);ctx.stroke();ctx.lineWidth=3;for(const [x,y,sx,sy] of [[337,370,1,1],[687,370,-1,1],[337,720,1,-1],[687,720,-1,-1]]){ctx.beginPath();ctx.moveTo(x,y+42*sy);ctx.lineTo(x,y);ctx.lineTo(x+42*sx,y);ctx.stroke();}ctx.font='22px Arial';ctx.fillStyle='#c0c2c6';ctx.font='25px Arial';ctx.fillText('anyloc.ru',512,910);});
-  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshBasicMaterial({map:front,transparent:true,depthWrite:false}));decal.position.z=.081;group.add(decal);
-  const tag=new THREE.Mesh(new THREE.CylinderGeometry(.655,.655,.045,96),new THREE.MeshStandardMaterial({color:0xd3d4d6,roughness:.32,metalness:.12}));tag.rotation.x=Math.PI/2;tag.position.set(0,-.09,.103);group.add(tag);
+  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshStandardMaterial({map:front,transparent:true,depthWrite:false,roughness:.68,metalness:.04}));decal.position.z=.05;group.add(decal);
+  const tag=new THREE.Mesh(new THREE.CylinderGeometry(.655,.655,.025,128),new THREE.MeshPhysicalMaterial({color:0xd3d4d6,roughness:.46,metalness:.03,clearcoat:.22,clearcoatRoughness:.3}));tag.rotation.x=Math.PI/2;tag.position.set(0,-.09,.066);group.add(tag);
   const tagTexture=texture(ctx=>{ctx.fillStyle='#303134';ctx.beginPath();ctx.arc(381,445,23,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#303134';ctx.lineWidth=25;ctx.lineCap='round';for(const r of [83,151,219]){ctx.beginPath();ctx.arc(381,445,r,-.77,.77);ctx.stroke();}ctx.textAlign='center';ctx.font='bold 60px Arial';ctx.fillText('NFC',512,733);ctx.font='25px Arial';ctx.fillText('TOUCH TO CONNECT',512,793);});
-  const tagPrint=new THREE.Mesh(new THREE.PlaneGeometry(1.28,1.28),new THREE.MeshBasicMaterial({map:tagTexture,transparent:true,depthWrite:false}));tagPrint.position.set(0,-.09,.129);group.add(tagPrint);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(.673,.012,12,96),new THREE.MeshStandardMaterial({color:0x737579,metalness:.7,roughness:.3}));ring.position.set(0,-.09,.1);group.add(ring);
-  function resize(){const width=stage.clientWidth,height=stage.clientHeight;renderer.setSize(width,height,false);camera.aspect=width/height;camera.position.z=window.innerWidth<700?9.5:8.9;camera.updateProjectionMatrix();start();}
-  let current=progress,raf=0,lastTime=0;
-  // One gradual revolution across the entire page, with frame-rate independent easing.
-  function frame(time){raf=0;if(document.hidden)return;const dt=Math.min((time-lastTime)/1000||.016,.05);lastTime=time;const target=reduced.matches?0:progress;const eased=(target-current)*(1-Math.exp(-dt/.65));const maxStep=dt*.10;current=reduced.matches?0:current+Math.max(-maxStep,Math.min(maxStep,eased));group.rotation.set(.18-current*Math.PI*2,-.3,-.1);group.position.y=.04;renderer.render(scene,camera);if(Math.abs(current-target)>.00001)raf=requestAnimationFrame(frame);}
-  function start(){if(!raf){lastTime=performance.now();raf=requestAnimationFrame(frame);}}
+  const tagPrint=new THREE.Mesh(new THREE.PlaneGeometry(1.28,1.28),new THREE.MeshStandardMaterial({map:tagTexture,transparent:true,depthWrite:false,roughness:.6}));tagPrint.position.set(0,-.09,.08);group.add(tagPrint);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.662,.007,16,128),new THREE.MeshStandardMaterial({color:0x555a60,metalness:.4,roughness:.4}));ring.position.set(0,-.09,.066);group.add(ring);
+
+  let current=reduced.matches?1:progress,visible=true,dirty=true;
+  const baseHalfSize=(3.35+.032)/2;
+  function applyCamera(value){
+    const width=stage.clientWidth,height=stage.clientHeight;
+    const zoom=cinematic(0,.84,value);
+    // Start as a close crop along the longer viewport dimension; finish with the whole plate visible.
+    const nearSide=Math.max(width,height)*.93;
+    const farSide=Math.min(width*.70,height*.57);
+    const projectedSide=nearSide+(farSide-nearSide)*zoom;
+    const distance=(baseHalfSize*height)/(Math.tan(camera.fov*Math.PI/360)*projectedSide);
+    camera.position.z=distance;
+    const turn=cinematic(.07,.84,value);
+    group.rotation.set(Math.PI*(1-turn)+.09*turn,-.015-.20*turn,-.035*turn);
+    group.position.y=.06*turn;
+    // Expose a sliver of the setting even in portrait close-ups where the plate extends beyond the viewport.
+    const margin=3*(1-smooth(0,.28,value));
+    canvas.style.clipPath=`inset(0 ${margin}% round ${12*(1-zoom)}px)`;
+    canvas.dataset.facing=turn<.5?'back':'front';
+    canvas.dataset.cameraDistance=distance.toFixed(3);
+    canvas.dataset.projectedSide=projectedSide.toFixed(1);
+    groundShadow.style.width=`${projectedSide*.88}px`;
+    groundShadow.style.height=`${projectedSide*.13}px`;
+    groundShadow.style.opacity=String(.25*cinematic(.35,.82,value));
+    presentScene(value);
+  }
+  function resize(){const width=stage.clientWidth,height=stage.clientHeight;renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();dirty=true;requestFrame();}
+  sceneFrame=delta=>{
+    if(!visible)return false;
+    const target=reduced.matches?1:progress;
+    if(!dirty&&current===target)return false;
+    current=reduced.matches?1:current+(target-current)*(1-Math.exp(-delta/.16));
+    if(Math.abs(target-current)<.00001)current=target;
+    applyCamera(current);renderer.render(scene,camera);dirty=false;
+    return current!==target;
+  };
   const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(stage);resize();
-  window.addEventListener('scroll',start,{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)start();});reduced.addEventListener('change',start);start();
+  const visibility=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){current=reduced.matches?1:progress;dirty=true;requestFrame();}},{rootMargin:'150px'});visibility.observe(intro);
+  reduced.addEventListener('change',()=>{measureScroll();dirty=true;requestFrame();});
+  const environmentTexture=new THREE.TextureLoader();
+  environmentTexture.load('assets/atrium.jpg',tex=>{tex.mapping=THREE.EquirectangularReflectionMapping;tex.colorSpace=THREE.SRGBColorSpace;const pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromEquirectangular(tex).texture;scene.environmentIntensity=.85;tex.dispose();pmrem.dispose();dirty=true;requestFrame();});
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();document.documentElement.classList.add('no-webgl');visible=false;presentScene(0);});
+  requestFrame();
 }
-initModel().catch(error=>{console.warn('3D preview unavailable',error);document.querySelector('#plate').hidden=true;document.querySelector('#model-fallback').hidden=false;});
+initModel().catch(error=>{console.warn('3D preview unavailable',error);document.documentElement.classList.add('no-webgl');presentScene(0);});
