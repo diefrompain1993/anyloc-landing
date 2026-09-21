@@ -88,7 +88,7 @@ async function initModel(){
   const group=new THREE.Group();scene.add(group);
   function roundedPath(w,h,r){const s=new THREE.Shape();s.moveTo(-w/2+r,-h/2);s.lineTo(w/2-r,-h/2);s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);s.lineTo(w/2,h/2-r);s.quadraticCurveTo(w/2,h/2,w/2-r,h/2);s.lineTo(-w/2+r,h/2);s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);s.lineTo(-w/2,-h/2+r);s.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);return s;}
   const shape=roundedPath(3.35,3.35,.24);
-  for(const x of [-1.34,1.34])for(const y of [-1.34,1.34]){const hole=new THREE.Path();hole.absarc(x,y,.14,0,Math.PI*2,true);shape.holes.push(hole);}
+  for(const x of [-1.43,1.43])for(const y of [-1.43,1.43]){const hole=new THREE.Path();hole.absarc(x,y,.075,0,Math.PI*2,true);shape.holes.push(hole);}
   const geo=new THREE.ExtrudeGeometry(shape,{depth:.065,bevelEnabled:true,bevelSegments:5,steps:1,bevelSize:.016,bevelThickness:.016,curveSegments:48});geo.translate(0,0,-.0325);
   // Three registered maps describe a fine powder-coated surface: pigment, roughness, and relief.
   // ExtrudeGeometry uses world-space cap UVs, so one texture spans the whole plate rather than tiling below a pixel.
@@ -114,14 +114,36 @@ async function initModel(){
   const faceMaterial=new THREE.MeshPhysicalMaterial({color:0x474c53,map:surfaceMap('color'),roughness:.6,roughnessMap:surfaceMap('roughness'),metalness:.25,clearcoat:.12,clearcoatRoughness:.48,bumpMap:surfaceMap('bump'),bumpScale:.004,envMapIntensity:.9});
   const edgeMaterial=new THREE.MeshPhysicalMaterial({color:0x282d34,roughness:.3,metalness:.45,clearcoat:.35,clearcoatRoughness:.25});
   const body=new THREE.Mesh(geo,[faceMaterial,edgeMaterial]);group.add(body);
-  // The supplied plate is reconstructed as geometry, with real through-holes and an unbranded NFC insert.
-  function texture(draw){const c=document.createElement('canvas');c.width=c.height=1024;const ctx=c.getContext('2d');draw(ctx);const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);return tex;}
-  const front=texture(ctx=>{ctx.strokeStyle='#dddddf';ctx.fillStyle='#ededee';ctx.lineWidth=3;ctx.textAlign='center';ctx.font='26px Arial';ctx.fillText('ПРИЛОЖИТЕ СМАРТФОН',512,150);ctx.beginPath();ctx.roundRect(265,278,494,840,62);ctx.stroke();ctx.beginPath();ctx.roundRect(290,305,444,830,43);ctx.stroke();ctx.lineWidth=3;for(const [x,y,sx,sy] of [[337,370,1,1],[687,370,-1,1],[337,720,1,-1],[687,720,-1,-1]]){ctx.beginPath();ctx.moveTo(x,y+42*sy);ctx.lineTo(x,y);ctx.lineTo(x+42*sx,y);ctx.stroke();}ctx.font='22px Arial';ctx.fillStyle='#c0c2c6';ctx.font='25px Arial';ctx.fillText('anyloc.ru',512,910);});
-  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshStandardMaterial({map:front,transparent:true,depthWrite:false,roughness:.68,metalness:.04}));decal.position.z=.05;group.add(decal);
-  const tag=new THREE.Mesh(new THREE.CylinderGeometry(.655,.655,.025,128),new THREE.MeshPhysicalMaterial({color:0xd3d4d6,roughness:.46,metalness:.03,clearcoat:.22,clearcoatRoughness:.3}));tag.rotation.x=Math.PI/2;tag.position.set(0,-.09,.066);group.add(tag);
-  const tagTexture=texture(ctx=>{ctx.fillStyle='#303134';ctx.beginPath();ctx.arc(381,445,23,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#303134';ctx.lineWidth=25;ctx.lineCap='round';for(const r of [83,151,219]){ctx.beginPath();ctx.arc(381,445,r,-.77,.77);ctx.stroke();}ctx.textAlign='center';ctx.font='bold 60px Arial';ctx.fillText('NFC',512,733);ctx.font='25px Arial';ctx.fillText('TOUCH TO CONNECT',512,793);});
-  const tagPrint=new THREE.Mesh(new THREE.PlaneGeometry(1.28,1.28),new THREE.MeshStandardMaterial({map:tagTexture,transparent:true,depthWrite:false,roughness:.6}));tagPrint.position.set(0,-.09,.08);group.add(tagPrint);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(.662,.007,16,128),new THREE.MeshStandardMaterial({color:0x555a60,metalness:.4,roughness:.4}));ring.position.set(0,-.09,.066);group.add(ring);
+  // Front artwork follows the photographed physical plate in normalized coordinates.
+  // Raised white paths stay crisp in perspective and receive the same lighting as the body.
+  const ink=new THREE.MeshStandardMaterial({color:0xf4f5f5,roughness:.62,metalness:.02});
+  const inkZ=.054,inkRadius=.011;
+  const point=(x,y)=>new THREE.Vector3((x-.5)*3.35,(.5-y)*3.35,inkZ);
+  function raisedLine(draw){
+    const path=new THREE.CurvePath();let cursor;
+    const pen={move(x,y){cursor=point(x,y);},line(x,y){const next=point(x,y);path.add(new THREE.LineCurve3(cursor,next));cursor=next;},curve(cx,cy,x,y){const next=point(x,y);path.add(new THREE.QuadraticBezierCurve3(cursor,point(cx,cy),next));cursor=next;}};
+    draw(pen);const mesh=new THREE.Mesh(new THREE.TubeGeometry(path,Math.max(96,path.curves.length*80),inkRadius,8,false),ink);group.add(mesh);
+    const cap=new THREE.SphereGeometry(inkRadius,12,8);
+    for(const end of [path.getPoint(0),path.getPoint(1)]){const bead=new THREE.Mesh(cap,ink);bead.position.copy(end);group.add(bead);}
+  }
+  function phoneOutline(left,right,top,radius){raisedLine(p=>{p.move(left,1);p.line(left,top+radius);p.curve(left,top,left+radius,top);p.line(right-radius,top);p.curve(right,top,right,top+radius);p.line(right,1);});}
+  phoneOutline(.163,.837,.035,.083);
+  phoneOutline(.180,.820,.053,.070);
+  raisedLine(p=>{p.move(.163,.381);p.curve(.137,.381,.137,.413);p.line(.137,.548);p.curve(.137,.580,.163,.580);});
+  raisedLine(p=>{p.move(.837,.225);p.curve(.861,.225,.861,.251);p.line(.861,.300);p.curve(.861,.326,.837,.326);});
+  for(const [x,y,sx,sy] of [[.261,.112,1,1],[.743,.112,-1,1],[.261,.593,1,-1],[.743,.593,-1,-1]]){
+    raisedLine(p=>{p.move(x,y+.059*sy);p.line(x,y+.010*sy);p.curve(x,y,x+.010*sx,y);p.line(x+.059*sx,y);});
+  }
+  await document.fonts.load('500 138px Manrope').catch(()=>{});
+  const lettering=document.createElement('canvas');lettering.width=lettering.height=2048;
+  const letteringContext=lettering.getContext('2d');letteringContext.scale(2,2);letteringContext.fillStyle='#ffffff';letteringContext.textAlign='center';
+  letteringContext.font='500 138px Manrope, Arial, sans-serif';letteringContext.fillText('Anyloc',512,793);
+  letteringContext.font='500 83px Manrope, Arial, sans-serif';letteringContext.fillText('Anyloc',512,951);
+  const front=new THREE.CanvasTexture(lettering);front.colorSpace=THREE.SRGBColorSpace;front.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
+  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshStandardMaterial({map:front,transparent:true,depthWrite:false,roughness:.62,metalness:.02,bumpMap:front,bumpScale:.003}));decal.position.z=.055;group.add(decal);
+  const tagRadius=.590,tagY=.490;
+  const tag=new THREE.Mesh(new THREE.CylinderGeometry(tagRadius,tagRadius,.025,128),new THREE.MeshPhysicalMaterial({color:0xe8ebed,roughness:.46,metalness:.03,clearcoat:.22,clearcoatRoughness:.3}));tag.rotation.x=Math.PI/2;tag.position.set(0,tagY,.066);group.add(tag);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(tagRadius+.007,.006,16,128),new THREE.MeshStandardMaterial({color:0x62666a,metalness:.2,roughness:.5}));ring.position.set(0,tagY,.066);group.add(ring);
 
   let current=reduced.matches?1:progress,visible=true,dirty=true;
   const baseHalfSize=(3.35+.032)/2;
