@@ -41,7 +41,11 @@ async function initSmoothScroll(){
     scrollDriver?.destroy();scrollDriver=null;
     if(desktop.matches&&!reduced.matches){
       scrollDriver=new Lenis({autoRaf:false,lerp:.095,smoothWheel:true,syncTouch:false,wheelMultiplier:.85,anchors:false});
-      scrollDriver.on('virtual-scroll',requestFrame);
+      scrollDriver.on('virtual-scroll',()=>{
+        // Keep the approved plate timing; let content below the pinned scene scroll natively.
+        scrollDriver.options.smoothWheel=window.scrollY<introTop+introRange;
+        requestFrame();
+      });
       scrollDriver.on('scroll',updateScroll);
     }
     requestFrame();
