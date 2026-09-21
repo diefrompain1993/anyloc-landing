@@ -40,7 +40,7 @@ async function initSmoothScroll(){
   function configure(){
     scrollDriver?.destroy();scrollDriver=null;
     if(desktop.matches&&!reduced.matches){
-      scrollDriver=new Lenis({autoRaf:false,lerp:.065,smoothWheel:true,syncTouch:false,wheelMultiplier:.85,anchors:false});
+      scrollDriver=new Lenis({autoRaf:false,lerp:.095,smoothWheel:true,syncTouch:false,wheelMultiplier:.85,anchors:false});
       scrollDriver.on('virtual-scroll',requestFrame);
       scrollDriver.on('scroll',updateScroll);
     }
@@ -53,7 +53,7 @@ async function initSmoothScroll(){
     const target=hash==='#'?document.querySelector('#top'):document.getElementById(decodeURIComponent(hash.slice(1)));
     if(!target)return;
     event.preventDefault();history.pushState(null,'',hash);
-    scrollDriver.scrollTo(target,{offset:target===intro?0:-50,lerp:0,duration:1.8,easing:t=>1-Math.pow(1-t,4),onStart:requestFrame,onComplete:()=>{
+    scrollDriver.scrollTo(target,{offset:target===intro?0:-50,lerp:0,duration:1.35,easing:t=>1-Math.pow(1-t,4),onStart:requestFrame,onComplete:()=>{
       if(link.classList.contains('skip')){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
     }});
   });
@@ -175,7 +175,7 @@ async function initModel(){
     if(!visible)return false;
     const target=reduced.matches?1:progress;
     if(!dirty&&current===target)return false;
-    current=reduced.matches?1:current+(target-current)*(1-Math.exp(-delta/.16));
+    current=reduced.matches?1:current+(target-current)*(1-Math.exp(-delta/.11));
     if(Math.abs(target-current)<.00001)current=target;
     applyCamera(current);renderer.render(scene,camera);dirty=false;
     return current!==target;
