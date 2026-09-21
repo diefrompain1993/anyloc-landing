@@ -119,8 +119,9 @@ async function initModel(){
   const edgeMaterial=new THREE.MeshPhysicalMaterial({color:0x282d34,roughness:.3,metalness:.45,clearcoat:.35,clearcoatRoughness:.25});
   const body=new THREE.Mesh(geo,[faceMaterial,edgeMaterial]);group.add(body);
   // Front artwork follows the photographed physical plate in normalized coordinates.
-  // Raised white paths stay crisp in perspective and receive the same lighting as the body.
-  const ink=new THREE.MeshStandardMaterial({color:0xf4f5f5,roughness:.62,metalness:.02});
+  // Raised warm sand-gold artwork matches the physical plate and shares the scene's lighting.
+  const inkColor=0xe1a05b;
+  const ink=new THREE.MeshStandardMaterial({color:inkColor,roughness:.62,metalness:.02});
   const inkZ=.054,inkRadius=.011;
   const point=(x,y)=>new THREE.Vector3((x-.5)*3.35,(.5-y)*3.35,inkZ);
   function raisedLine(draw){
@@ -138,13 +139,12 @@ async function initModel(){
   for(const [x,y,sx,sy] of [[.261,.112,1,1],[.743,.112,-1,1],[.261,.593,1,-1],[.743,.593,-1,-1]]){
     raisedLine(p=>{p.move(x,y+.059*sy);p.line(x,y+.010*sy);p.curve(x,y,x+.010*sx,y);p.line(x+.059*sx,y);});
   }
-  await document.fonts.load('500 138px Manrope').catch(()=>{});
+  await document.fonts.load('500 110px Manrope').catch(()=>{});
   const lettering=document.createElement('canvas');lettering.width=lettering.height=2048;
   const letteringContext=lettering.getContext('2d');letteringContext.scale(2,2);letteringContext.fillStyle='#ffffff';letteringContext.textAlign='center';
-  letteringContext.font='500 138px Manrope, Arial, sans-serif';letteringContext.fillText('Anyloc',512,793);
-  letteringContext.font='500 83px Manrope, Arial, sans-serif';letteringContext.fillText('Anyloc',512,951);
+  letteringContext.font='500 110px Manrope, Arial, sans-serif';letteringContext.fillText('Anyloc',512,872);
   const front=new THREE.CanvasTexture(lettering);front.colorSpace=THREE.SRGBColorSpace;front.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
-  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshStandardMaterial({map:front,transparent:true,depthWrite:false,roughness:.62,metalness:.02,bumpMap:front,bumpScale:.003}));decal.position.z=.055;group.add(decal);
+  const decal=new THREE.Mesh(new THREE.PlaneGeometry(3.35,3.35),new THREE.MeshStandardMaterial({color:inkColor,map:front,transparent:true,depthWrite:false,roughness:.62,metalness:.02,bumpMap:front,bumpScale:.003}));decal.position.z=.055;group.add(decal);
   const tagRadius=.590,tagY=.490;
   const tag=new THREE.Mesh(new THREE.CylinderGeometry(tagRadius,tagRadius,.025,128),new THREE.MeshPhysicalMaterial({color:0xe8ebed,roughness:.46,metalness:.03,clearcoat:.22,clearcoatRoughness:.3}));tag.rotation.x=Math.PI/2;tag.position.set(0,tagY,.066);group.add(tag);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(tagRadius+.007,.006,16,128),new THREE.MeshStandardMaterial({color:0x62666a,metalness:.2,roughness:.5}));ring.position.set(0,tagY,.066);group.add(ring);
