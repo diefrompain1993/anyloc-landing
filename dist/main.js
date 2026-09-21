@@ -90,13 +90,28 @@ async function initModel(){
   const shape=roundedPath(3.35,3.35,.24);
   for(const x of [-1.34,1.34])for(const y of [-1.34,1.34]){const hole=new THREE.Path();hole.absarc(x,y,.14,0,Math.PI*2,true);shape.holes.push(hole);}
   const geo=new THREE.ExtrudeGeometry(shape,{depth:.065,bevelEnabled:true,bevelSegments:5,steps:1,bevelSize:.016,bevelThickness:.016,curveSegments:48});geo.translate(0,0,-.0325);
-  // Fine moulded grain catches the atrium's light without making the plate look scratched.
-  const grainCanvas=document.createElement('canvas');grainCanvas.width=grainCanvas.height=256;
-  const grainContext=grainCanvas.getContext('2d'),grainPixels=grainContext.createImageData(256,256);
-  let seed=1977;for(let i=0;i<grainPixels.data.length;i+=4){seed=(1664525*seed+1013904223)>>>0;const v=115+(seed>>>26);grainPixels.data.set([v,v,v,255],i);}
-  grainContext.putImageData(grainPixels,0,0);
-  const grain=new THREE.CanvasTexture(grainCanvas);grain.wrapS=grain.wrapT=THREE.RepeatWrapping;grain.repeat.set(7,7);
-  const faceMaterial=new THREE.MeshPhysicalMaterial({color:0x41454b,roughness:.42,metalness:.32,clearcoat:.28,clearcoatRoughness:.32,bumpMap:grain,bumpScale:.0015,envMapIntensity:.9});
+  // Three registered maps describe a fine powder-coated surface: pigment, roughness, and relief.
+  // ExtrudeGeometry uses world-space cap UVs, so one texture spans the whole plate rather than tiling below a pixel.
+  let seed=1977;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
+  const textureSize=1024,gridSize=513,noise=Float32Array.from({length:gridSize*gridSize},random);
+  function surfaceMap(kind){
+    const surface=document.createElement('canvas');surface.width=surface.height=textureSize;
+    const context=surface.getContext('2d'),pixels=context.createImageData(textureSize,textureSize);
+    for(let y=0;y<textureSize;y++)for(let x=0;x<textureSize;x++){
+      const gx=x/2,gy=y/2,ix=Math.floor(gx),iy=Math.floor(gy),tx=gx-ix,ty=gy-iy;
+      const a=noise[iy*gridSize+ix]*(1-tx)+noise[iy*gridSize+ix+1]*tx;
+      const b=noise[(iy+1)*gridSize+ix]*(1-tx)+noise[(iy+1)*gridSize+ix+1]*tx;
+      const grain=a*(1-ty)+b*ty,fine=random()-.5;
+      const v=kind==='color'?227+grain*16+fine*8:kind==='roughness'?182+grain*54+fine*12:85+grain*85+fine*20;
+      const i=(y*textureSize+x)*4;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=v;pixels.data[i+3]=255;
+    }
+    context.putImageData(pixels,0,0);
+    const map=new THREE.CanvasTexture(surface);map.wrapS=map.wrapT=THREE.RepeatWrapping;
+    map.repeat.set(1/3.35,1/3.35);map.offset.set(.5,.5);map.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),8);
+    if(kind==='color')map.colorSpace=THREE.SRGBColorSpace;
+    return map;
+  }
+  const faceMaterial=new THREE.MeshPhysicalMaterial({color:0x474c53,map:surfaceMap('color'),roughness:.6,roughnessMap:surfaceMap('roughness'),metalness:.25,clearcoat:.12,clearcoatRoughness:.48,bumpMap:surfaceMap('bump'),bumpScale:.004,envMapIntensity:.9});
   const edgeMaterial=new THREE.MeshPhysicalMaterial({color:0x282d34,roughness:.3,metalness:.45,clearcoat:.35,clearcoatRoughness:.25});
   const body=new THREE.Mesh(geo,[faceMaterial,edgeMaterial]);group.add(body);
   // The supplied plate is reconstructed as geometry, with real through-holes and an unbranded NFC insert.
@@ -113,8 +128,8 @@ async function initModel(){
   function applyCamera(value){
     const width=stage.clientWidth,height=stage.clientHeight;
     const zoom=cinematic(0,.84,value);
-    // Start as a close crop along the longer viewport dimension; finish with the whole plate visible.
-    const nearSide=Math.max(width,height)*.93;
+    // Frame against both dimensions so all four mounting holes remain visible on wide monitors.
+    const nearSide=width>700?Math.min(width*.93,height*.97):Math.max(width,height)*.93;
     const farSide=Math.min(width*.70,height*.57);
     const projectedSide=nearSide+(farSide-nearSide)*zoom;
     const distance=(baseHalfSize*height)/(Math.tan(camera.fov*Math.PI/360)*projectedSide);
