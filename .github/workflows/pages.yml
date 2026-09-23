@@ -26,7 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Check JavaScript
-        run: node --check dist/main.js
+        run: |
+          node --check dist/main.js
+          node --check dist/lower.js
+          node --check dist/product-ui.js
       - name: Version browser assets
         run: node scripts/prepare-pages.mjs
       - name: Configure Pages
