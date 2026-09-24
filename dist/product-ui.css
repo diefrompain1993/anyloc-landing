@@ -27,3 +27,21 @@
 .al-paper-stack .al-paper-label:focus:not(:focus-visible){outline:none}
 .intro-scroll{left:auto;right:10px;bottom:26px;transform:none;text-shadow:none}
 .intro-scroll-arrow{width:36px;height:48px;background:#26343980;backdrop-filter:blur(8px)}
+
+/* Stable card preview: filtering changes rows, never the dialog geometry. */
+.al-preview-dialog[open]{display:flex;flex-direction:column;height:min(82svh,680px);max-height:90svh;box-sizing:border-box}
+.al-preview-dialog .al-preview-heading{flex:none}
+.al-preview-dialog #preview-content{flex:1;min-height:0;max-height:none;overflow:auto;background:#fff}
+.pu-export{padding:18px 20px;height:100%;display:flex;flex-direction:column;box-sizing:border-box}
+.pu-export h3{margin:0;color:#233952;font-size:17px;font-weight:720}
+.pu-export-options{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+.pu-export-options>button{display:grid;grid-template-columns:34px minmax(0,1fr) 17px;align-items:center;gap:8px;padding:7px 9px;min-height:50px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;color:#50657f;text-align:left;cursor:pointer}
+.pu-export-options>button:hover{border-color:#b8cbea;background:#f8faff}
+.pu-export-options>button[aria-pressed=true]{border-color:#8eb1f2;background:#f0f5ff;box-shadow:0 0 0 2px #2864eb12}
+.pu-export-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:#edf3fc;color:#3b68ae}
+.pu-export-icon svg{width:18px;height:18px}
+.pu-export-options strong{font-size:13px;color:#2a405b}
+.pu-export-options i{width:16px;height:16px;border:1px solid #bac8da;border-radius:50%;background:#fff;box-sizing:border-box}
+.pu-export-options [aria-pressed=true] i{border-color:#2864eb;background:radial-gradient(circle,#2864eb 0 4px,#fff 4.5px)}
+.pu-export-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:12px;color:#7d8da2;font-size:12px}
+.pu-export-footer button{border:0;border-radius:8px;background:#2864eb;color:white;padding:10px 16px;cursor:pointer;font-weight:600}
