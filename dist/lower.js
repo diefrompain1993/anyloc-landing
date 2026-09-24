@@ -20,7 +20,6 @@ document.querySelectorAll('[data-place]').forEach(button => button.addEventListe
  document.querySelectorAll('[data-place]').forEach(other=>other.setAttribute('aria-pressed',String(other===button)));
  const detail=document.querySelector('#place-detail');
  detail.innerHTML=`<h3>${data[1]}</h3><p>${data[2]}</p>`;
- document.querySelector('#place-context').textContent=data[0];
  if(!quiet.matches) detail.animate([{opacity:.3,transform:'translateY(7px)'},{opacity:1,transform:'translateY(0)'}],{duration:280,easing:'ease-out'});
 }));
 
@@ -90,7 +89,6 @@ function setTab(key){
  document.querySelector('#app-content').innerHTML=adminView(data.screen);
  document.querySelector('#demo-panel').setAttribute('aria-labelledby',`tab-${key}`);
  tabs.forEach(tab=>{const active=tab.dataset.tab===key;tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;});
- document.querySelector('.al-demo-caption>span:last-child').textContent='Живой интерфейс · демонстрационные данные';
 }
 tabs.forEach((button,index)=>{
  button.addEventListener('click',()=>setTab(button.dataset.tab));
@@ -109,3 +107,27 @@ bindProductUI(world,{open:openUI,step:setStep});
 preview.querySelector('[data-close-preview]').addEventListener('click',()=>preview.close());
 preview.addEventListener('click',event=>{if(event.target===preview)preview.close();});
 preview.addEventListener('close',()=>previousFocus?.focus({preventScroll:true}));
+
+// Swap the front card with the selected slot, keeping all three slots occupied.
+const paperStack=document.querySelector('.al-paper-stack');
+function updatePaperAccess(){
+ paperStack.querySelectorAll('.al-paper').forEach(card=>{
+  const front=card.classList.contains('al-paper-front');
+  card.querySelector('.al-paper-viewport').inert=!front;
+  const button=card.querySelector('.al-paper-label');
+  const title=button.childNodes[0].textContent.trim();
+  button.setAttribute('aria-label',front?'Открыть: '+title:'Показать карточку: '+title);
+ });
+}
+paperStack.addEventListener('click',event=>{
+ const card=event.target.closest('.al-paper');
+ if(!card||card.classList.contains('al-paper-front'))return;
+ event.preventDefault();event.stopPropagation();
+ const front=paperStack.querySelector('.al-paper-front');
+ const slot=card.classList.contains('al-paper-back')?'al-paper-back':'al-paper-middle';
+ front.classList.replace('al-paper-front',slot);
+ card.classList.replace(slot,'al-paper-front');
+ updatePaperAccess();
+ card.querySelector('.al-paper-label').focus({preventScroll:true});
+},true);
+updatePaperAccess();
