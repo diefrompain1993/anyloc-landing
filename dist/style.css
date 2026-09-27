@@ -46,3 +46,8 @@ html.lenis{scroll-behavior:auto!important}
 .intro-ground-shadow{position:absolute;left:50%;top:78%;z-index:1;transform:translate(-50%,-50%) rotate(-8deg);border-radius:50%;background:radial-gradient(ellipse,#253442 0%,#33404b80 35%,transparent 70%);filter:blur(14px);opacity:0;pointer-events:none}
 .no-webgl .intro-ground-shadow{display:none}
 @media(min-width:701px){.intro-brand{width:min(42vw,520px)}}
+
+/* One-screen, autonomous introduction. No scroll runway or pinned scene. */
+.intro{height:100svh}
+.intro-pin{position:relative}
+.intro-progress{display:none}

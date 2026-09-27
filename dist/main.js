@@ -16,12 +16,13 @@ function animate(time){
   const moving=sceneFrame(delta);
   if((moving||scrollDriver?.isScrolling==='smooth')&&!document.hidden)animationFrame=requestAnimationFrame(animate);
 }
-let progress=0,introTop=0,introRange=1;
+let progress=0;
+const INTRO_HOLD_SECONDS=2.5,INTRO_TURN_SECONDS=4.5;
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*(3-2*t);};
 const cinematic=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*t*(10+t*(-15+6*t));};
-function measureScroll(){introTop=window.scrollY+intro.getBoundingClientRect().top;introRange=Math.max(1,intro.offsetHeight-introPin.offsetHeight);updateScroll();}
-function updateScroll(){progress=clamp((window.scrollY-introTop)/introRange);document.querySelector('.header').classList.toggle('is-past-intro',window.scrollY>intro.offsetHeight-100);}
+function measureScroll(){updateScroll();}
+function updateScroll(){document.querySelector('.header').classList.toggle('is-past-intro',window.scrollY>intro.offsetHeight-100);}
 window.addEventListener('scroll',updateScroll,{passive:true});window.addEventListener('resize',measureScroll);new ResizeObserver(measureScroll).observe(intro);measureScroll();
 window.addEventListener('scroll',requestFrame,{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(animationFrame);animationFrame=0;}else requestFrame();});
@@ -31,10 +32,9 @@ async function initSmoothScroll(){
   function configure(){
     scrollDriver?.destroy();scrollDriver=null;
     if(desktop.matches&&!reduced.matches){
-      scrollDriver=new Lenis({autoRaf:false,lerp:.095,smoothWheel:true,syncTouch:false,wheelMultiplier:.85,anchors:false});
+      scrollDriver=new Lenis({autoRaf:false,lerp:.095,smoothWheel:false,syncTouch:false,wheelMultiplier:.85,anchors:false});
       scrollDriver.on('virtual-scroll',()=>{
-        // Keep the approved plate timing; let content below the pinned scene scroll natively.
-        scrollDriver.options.smoothWheel=window.scrollY<introTop+introRange;
+        // Wheel scrolling remains native; the plate has its own one-shot timeline.
         requestFrame();
       });
       scrollDriver.on('scroll',updateScroll);
@@ -59,8 +59,8 @@ function presentScene(value){
   const fade=smooth(.015,.21,value);
   brand.style.opacity=String(reduced.matches?1:1-fade);
   brand.style.transform=`translate(-50%,-50%) translateY(${-fade*24}px)`;
-  scrollHint.style.opacity=String(reduced.matches?0:1-smooth(.01,.14,value));
-  scrollHint.style.visibility=reduced.matches||value>.14?'hidden':'visible';
+  scrollHint.style.opacity='1';
+  scrollHint.style.visibility='visible';
   reveal.style.opacity=String(reduced.matches?1:smooth(.77,.92,value));
   reveal.style.transform=`translateY(${(1-smooth(.77,.92,value))*18}px)`;
   environment.style.transform=`scale(${1.055-.055*smooth(0,1,value)})`;
@@ -140,7 +140,7 @@ async function initModel(){
   const tag=new THREE.Mesh(new THREE.CylinderGeometry(tagRadius,tagRadius,.025,128),new THREE.MeshPhysicalMaterial({color:0xe8ebed,roughness:.46,metalness:.03,clearcoat:.22,clearcoatRoughness:.3}));tag.rotation.x=Math.PI/2;tag.position.set(0,tagY,.066);group.add(tag);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(tagRadius+.007,.006,16,128),new THREE.MeshStandardMaterial({color:0x62666a,metalness:.2,roughness:.5}));ring.position.set(0,tagY,.066);group.add(ring);
 
-  let current=reduced.matches?1:progress,visible=true,dirty=true;
+  let current=reduced.matches?1:progress,visible=true,dirty=true,introElapsed=0;
   const baseHalfSize=(3.35+.032)/2;
   function applyCamera(value){
     const width=stage.clientWidth,height=stage.clientHeight;
@@ -168,12 +168,16 @@ async function initModel(){
   function resize(){const width=stage.clientWidth,height=stage.clientHeight;renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();dirty=true;requestFrame();}
   sceneFrame=delta=>{
     if(!visible)return false;
-    const target=reduced.matches?1:progress;
-    if(!dirty&&current===target)return false;
+    // Count only visible animation frames: loading or a background tab cannot consume the logo hold.
+    introElapsed+=delta;
+    progress=reduced.matches?1:clamp((introElapsed-INTRO_HOLD_SECONDS)/INTRO_TURN_SECONDS);
+    const target=progress;
+    const playing=progress<1;
+    if(!dirty&&current===target)return playing;
     current=reduced.matches?1:current+(target-current)*(1-Math.exp(-delta/.11));
     if(Math.abs(target-current)<.00001)current=target;
     applyCamera(current);renderer.render(scene,camera);dirty=false;
-    return current!==target;
+    return playing||current!==target;
   };
   const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(stage);resize();
   const visibility=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){current=reduced.matches?1:progress;dirty=true;requestFrame();}},{rootMargin:'150px'});visibility.observe(intro);
