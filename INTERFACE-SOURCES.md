@@ -36,4 +36,4 @@ SwiftUI перенесён в браузерную разметку с масш�
 
 Имена и события демонстрационные; изменения хранятся только в памяти страницы. Подключения к API, учётным записям и реальным рабочим данным нет.
 
-Export format panel: YK-main/src/app/OperationsPages.tsx (ExportPreviewDialog) and src/styles/operations.css. Excel/CSV/JSON selection and client-side download ported with the same sample records as the landing; exported filenames use anyloc-demo.
+Export format panel: YK-main/src/app/OperationsPages.tsx (ExportPreviewDialog) and src/styles/operations.css. Excel/CSV/JSON format selection is shown as a live frontend fragment. The landing does not download files or display an export record count.

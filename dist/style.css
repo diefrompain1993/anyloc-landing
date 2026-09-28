@@ -51,3 +51,6 @@ html.lenis{scroll-behavior:auto!important}
 .intro{height:100svh}
 .intro-pin{position:relative}
 .intro-progress{display:none}
+
+/* Anchor targets meet the viewport edge consistently, including native links. */
+html{scroll-padding-top:0}

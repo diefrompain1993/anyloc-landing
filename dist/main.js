@@ -2,7 +2,6 @@ const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
 const intro=document.querySelector('.intro');
 const introPin=document.querySelector('.intro-pin');
 const brand=document.querySelector('.intro-brand');
-const scrollHint=document.querySelector('.intro-scroll');
 const reveal=document.querySelector('.intro-reveal');
 const environment=document.querySelector('.intro-environment');
 const atmosphere=document.querySelector('.intro-atmosphere');
@@ -17,7 +16,7 @@ function animate(time){
   if((moving||scrollDriver?.isScrolling==='smooth')&&!document.hidden)animationFrame=requestAnimationFrame(animate);
 }
 let progress=0;
-const INTRO_HOLD_SECONDS=2.5,INTRO_TURN_SECONDS=4.5;
+const INTRO_HOLD_SECONDS=1.5,INTRO_TURN_SECONDS=4.5;
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*(3-2*t);};
 const cinematic=(from,to,value)=>{const t=clamp((value-from)/(to-from));return t*t*t*(10+t*(-15+6*t));};
@@ -48,7 +47,7 @@ async function initSmoothScroll(){
     const target=hash==='#'?document.querySelector('#top'):document.getElementById(decodeURIComponent(hash.slice(1)));
     if(!target)return;
     event.preventDefault();history.pushState(null,'',hash);
-    scrollDriver.scrollTo(target,{offset:target===intro?0:-50,lerp:0,duration:1.35,easing:t=>1-Math.pow(1-t,4),onStart:requestFrame,onComplete:()=>{
+    scrollDriver.scrollTo(target,{offset:0,lerp:0,duration:1.35,easing:t=>1-Math.pow(1-t,4),onStart:requestFrame,onComplete:()=>{
       if(link.classList.contains('skip')){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
     }});
   });
@@ -59,8 +58,6 @@ function presentScene(value){
   const fade=smooth(.015,.21,value);
   brand.style.opacity=String(reduced.matches?1:1-fade);
   brand.style.transform=`translate(-50%,-50%) translateY(${-fade*24}px)`;
-  scrollHint.style.opacity='1';
-  scrollHint.style.visibility='visible';
   reveal.style.opacity=String(reduced.matches?1:smooth(.77,.92,value));
   reveal.style.transform=`translateY(${(1-smooth(.77,.92,value))*18}px)`;
   environment.style.transform=`scale(${1.055-.055*smooth(0,1,value)})`;
