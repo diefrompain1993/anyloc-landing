@@ -185,3 +185,13 @@ async function initModel(){
   requestFrame();
 }
 initModel().catch(error=>{console.warn('3D preview unavailable',error);document.documentElement.classList.add('no-webgl');presentScene(0);});
+// Subtle reflections follow the pointer; the artwork itself stays undistorted.
+const glassHeader=document.querySelector('.header');
+if(!reduced.matches){
+ glassHeader.addEventListener('pointermove',event=>{
+  const surface=event.target.closest('.brand,nav,.header-cta');if(!surface)return;
+  const rect=surface.getBoundingClientRect();
+  surface.style.setProperty('--glass-x',`${(event.clientX-rect.left)/rect.width*100}%`);
+  surface.style.setProperty('--glass-y',`${(event.clientY-rect.top)/rect.height*100}%`);
+ });
+}
